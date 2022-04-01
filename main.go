@@ -3,43 +3,43 @@ package main
 import (
 	"flag"
 	"fmt"
-	"net"
-	"os"
+	"os/exec"
+	"strconv"
+	"strings"
+	"sync"
 )
 
+var wg sync.WaitGroup
+
 func main() {
-	var CIDR = flag.String("cidr", "anonymous", "type cidr")
-
+	var IP = flag.String("ip", "", "type ip")
+	var SUBNET = flag.Int("subnet", 1234, "subnet")
 	flag.Parse()
-
-	// generate a range of IP version 4 addresses from a Classless Inter-Domain Routing address
-	ipAddress, ipNet, err := net.ParseCIDR(*CIDR)
-
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+	ip := *IP
+	sub := *SUBNET
+	wg.Add(sub)
+	for i := 1; i <= sub; i++ {
+		true_ip := ip + strconv.Itoa(i)
+		go ping(true_ip)
 	}
-
-	// generate a range of IPv4 addresses from the CIDR address
-	var ipAddresses []string
-
-	for ipAddress := ipAddress.Mask(ipNet.Mask); ipNet.Contains(ipAddress); inc(ipAddress) {
-		//fmt.Println(ipAddress)
-		ipAddresses = append(ipAddresses, ipAddress.String())
-	}
-
-	// list out the ipAddresses within range
-	for key, ipAddress := range ipAddresses {
-		fmt.Printf("[%v] %s\n", key, ipAddress)
-	}
-
+	wg.Wait()
 }
 
-func inc(ip net.IP) {
-	for j := len(ip) - 1; j >= 0; j-- {
-		ip[j]++
-		if ip[j] > 0 {
-			break
-		}
+func ping(ipAddress string) {
+	var beaf = "false"
+	Command := fmt.Sprintf("ping -c 1 %s  > /dev/null && echo true || echo false", ipAddress)
+	output, err := exec.Command("/bin/sh", "-c", Command).Output()
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
+	real_ip := strings.TrimSpace(string(output))
+
+	if real_ip == beaf {
+		fmt.Printf("IP: %s   fail \n", ipAddress)
+	} else {
+
+		fmt.Printf("IP: %s   success ping pass \n", ipAddress)
+	}
+	wg.Done()
 }
